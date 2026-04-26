@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="授業ログ">
+<meta name="theme-color" content="#2563eb">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>授業ログ</title>
+<style>
+  :root {
+    --bg:#f5f5f0; --surface:#fff; --surface2:#f0efe8;
+    --border:#ddd; --text:#1a1a1a; --text-muted:#666;
+    --accent:#2563eb; --accent-light:#dbeafe;
+    --todo:#d97706; --todo-light:#fef3c7;
+    --prev:#0891b2; --prev-light:#e0f7fa;
+    --danger:#dc2626; --danger-light:#fee2e2;
+    --radius:10px; --shadow:0 1px 4px rgba(0,0,0,.1);
+  }
+  @media (prefers-color-scheme:dark) {
+    :root {
+      --bg:#1a1a1a; --surface:#252525; --surface2:#2e2e2e;
+      --border:#3a3a3a; --text:#f0f0f0; --text-muted:#999;
+      --accent-light:#1e3a6e; --todo-light:#3a2a00; --prev-light:#083344; --danger-light:#3a0a0a;
+    }
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,"Hiragino Sans",sans-serif; background:var(--bg); color:var(--text); font-size:15px; min-height:100vh; }
+
+  /* Header */
+  .app-header {
+    background:var(--surface); border-bottom:1px solid var(--border);
+    position:sticky; top:0; z-index:10;
+    display:flex; align-items:center; padding:0 12px; gap:0;
+    box-shadow:var(--shadow); overflow-x:auto;
+  }
+  .app-title { font-size:16px; font-weight:800; margin-right:12px; white-space:nowrap; flex-shrink:0; }
+  .app-title span { color:var(--accent); }
+  .tabs { display:flex; flex:1; }
+  .tab-btn {
+    padding:14px 14px; font-size:14px; font-weight:600;
+    border:none; background:none; cursor:pointer; color:var(--text-muted);
+    border-bottom:3px solid transparent; white-space:nowrap; flex-shrink:0;
+  }
+  .tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
+  .tab-count {
+    display:inline-flex; align-items:center; justify-content:center;
+    background:var(--surface2); border-radius:20px;
+    font-size:11px; padding:1px 7px; margin-left:5px; color:var(--text-muted);
+  }
+  .tab-btn.active .tab-count { background:var(--accent-light); color:var(--accent); }
+  #sync-indicator { font-size:11px; color:var(--text-muted); white-space:nowrap; padding:0 8px; flex-shrink:0; align-self:center; }
+
+  /* Pages */
+  .page { display:none; }
+  .page.active { display:block; }
+
+  /* Form card */
+  .form-card {
+    background:var(--surface);
+    border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+    padding:16px 14px; display:flex; flex-direction:column; gap:16px;
+  }
+  @media (min-width:1024px) {
+    .form-card { max-width:560px; margin:28px auto; border-radius:var(--radius); border:1px solid var(--border); padding:24px; box-shadow:var(--shadow); }
+  }
+  label { font-size:12px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; display:block; margin-bottom:5px; }
+  input, select, textarea {
+    width:100%; padding:9px 12px; border:1.5px solid var(--border); border-radius:7px;
+    background:var(--surface2); color:var(--text); font-family:inherit; font-size:16px;
+    outline:none; transition:border-color .15s;
+  }
+  @media (min-width:1024px) { input, select, textarea { font-size:14px; } }
+  input:focus, select:focus, textarea:focus { border-color:var(--accent); }
+  textarea { resize:vertical; min-height:100px; line-height:1.7; }
+  textarea.todo-area { border-color:var(--todo); }
+
+  .subject-info { border-radius:8px; overflow:hidden; border:1px solid var(--border); display:none; }
+  .subject-info.visible { display:block; }
+  .subject-info-header { background:var(--accent-light); padding:9px 13px; display:flex; align-items:center; gap:9px; }
+  .nth-badge { background:var(--accent); color:#fff; font-size:13px; font-weight:700; padding:2px 11px; border-radius:20px; }
+  .subject-info-header .sub-label { font-size:13px; color:var(--text-muted); }
+  .prev-box { padding:11px 13px; background:var(--prev-light); }
+  .prev-box-title { font-size:11px; font-weight:700; color:var(--prev); text-transform:uppercase; letter-spacing:.06em; margin-bottom:5px; }
+  .prev-content { font-size:13px; line-height:1.7; color:var(--text); white-space:pre-wrap; }
+  .prev-todo { margin-top:7px; padding:6px 9px; background:var(--todo-light); border-radius:5px; font-size:12px; color:var(--todo); white-space:pre-wrap; line-height:1.6; }
+  .prev-todo::before { content:"→ 前回TODO: "; font-weight:700; }
+
+  .btn-save { padding:12px; background:var(--accent); color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:700; cursor:pointer; }
+  .btn-save:hover { opacity:.85; }
+  .btn-save:disabled { opacity:.5; cursor:not-allowed; }
+  .flash { padding:9px 13px; border-radius:7px; font-size:13px; text-align:center; display:none; }
+  .flash.show { display:block; }
+  .flash.ok  { background:#dcfce7; color:#15803d; }
+  .flash.err { background:var(--danger-light); color:var(--danger); }
+
+  /* List */
+  .list-page { padding:10px 8px; width:100%; }
+  .filter-bar {
+    background:var(--surface); border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+    padding:10px 8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px;
+  }
+  .filter-row1 { width:100%; display:flex; gap:8px; align-items:center; }
+  .filter-row1 input[type="text"] { flex:1; min-width:0; }
+  .filter-row2 { width:100%; display:flex; gap:8px; align-items:center; }
+  .filter-row2 select, .filter-row2 input[type="month"] { flex:1; min-width:0; }
+  .btn-export { padding:7px 14px; font-size:13px; border-radius:6px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text-muted); cursor:pointer; white-space:nowrap; }
+  .view-toggle { display:flex; border:1.5px solid var(--border); border-radius:7px; overflow:hidden; }
+  .vt-btn { padding:6px 12px; font-size:12px; font-weight:600; border:none; background:var(--surface2); color:var(--text-muted); cursor:pointer; }
+  .vt-btn.active { background:var(--accent); color:#fff; }
+  @media (min-width:1024px) {
+    .list-page { padding:24px 16px; max-width:900px; margin:0 auto; }
+    .filter-bar { border-radius:var(--radius); border:1px solid var(--border); padding:14px 16px; margin-bottom:16px; box-shadow:var(--shadow); }
+  }
+  .result-count { font-size:13px; color:var(--text-muted); white-space:nowrap; }
+  .subject-section { margin-bottom:24px; }
+  .section-header { display:flex; align-items:center; gap:10px; margin-bottom:10px; padding-bottom:6px; border-bottom:2px solid var(--accent); }
+  .section-title { font-size:15px; font-weight:800; color:var(--accent); }
+  .section-total { font-size:12px; color:var(--text-muted); }
+  .record-list { display:flex; flex-direction:column; gap:10px; }
+  .record-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow); position:relative; }
+  .record-card:hover { border-color:var(--accent); }
+  .card-top { display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+  .card-date { font-size:13px; color:var(--text-muted); }
+  .card-subject { font-size:13px; font-weight:700; color:var(--accent); }
+  .card-nth { font-size:11px; font-weight:700; color:var(--accent); background:var(--accent-light); padding:2px 8px; border-radius:20px; }
+  .card-content { font-size:14px; line-height:1.7; white-space:pre-wrap; color:var(--text); }
+  .card-todo { margin-top:10px; padding:8px 10px; background:var(--todo-light); border-radius:6px; font-size:13px; color:var(--todo); white-space:pre-wrap; line-height:1.6; }
+  .card-todo::before { content:"→ 次回: "; font-weight:700; }
+  .card-actions { position:absolute; top:11px; right:11px; display:flex; gap:4px; }
+  .btn-icon { background:none; border:none; cursor:pointer; color:var(--text-muted); font-size:15px; padding:3px 6px; border-radius:5px; line-height:1; }
+  .btn-icon:hover { background:var(--surface2); color:var(--text); }
+  .record-card.editing { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-light); }
+  .edit-form { display:flex; flex-direction:column; gap:9px; }
+  .edit-form textarea { min-height:70px; }
+  .edit-actions { display:flex; gap:6px; }
+  .btn-sm { padding:6px 14px; font-size:13px; border-radius:6px; border:none; cursor:pointer; font-weight:600; }
+  .btn-primary { background:var(--accent); color:#fff; }
+  .btn-cancel { background:var(--surface2); color:var(--text-muted); border:1px solid var(--border); }
+  .empty { text-align:center; color:var(--text-muted); padding:60px 20px; font-size:14px; }
+
+  /* Settings */
+  .settings-card {
+    background:var(--surface);
+    border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+    padding:16px 14px; display:flex; flex-direction:column; gap:14px;
+  }
+  @media (min-width:1024px) {
+    .settings-card { max-width:560px; margin:28px auto; border-radius:var(--radius); border:1px solid var(--border); padding:24px; box-shadow:var(--shadow); }
+  }
+  .settings-card h2 { font-size:14px; font-weight:800; color:var(--text); }
+  .subject-list-edit { display:flex; flex-direction:column; gap:7px; }
+  .subject-item { display:flex; align-items:center; gap:8px; padding:9px 12px; background:var(--surface2); border-radius:7px; border:1px solid var(--border); }
+  .subject-item-name { flex:1; font-size:14px; }
+  .subject-order-btns { display:flex; gap:2px; }
+  .btn-order { background:none; border:1px solid var(--border); border-radius:4px; cursor:pointer; color:var(--text-muted); font-size:12px; padding:2px 6px; line-height:1.4; }
+  .btn-order:hover:not(:disabled) { background:var(--surface); color:var(--text); }
+  .btn-order:disabled { opacity:.3; cursor:default; }
+  .btn-del { background:none; border:none; cursor:pointer; color:var(--text-muted); font-size:16px; padding:2px 6px; border-radius:5px; line-height:1; }
+  .btn-del:hover { background:var(--danger-light); color:var(--danger); }
+  .add-subject-row { display:flex; gap:8px; }
+  .add-subject-row input { flex:1; }
+  .add-subject-row button { white-space:nowrap; padding:9px 16px; font-size:14px; border-radius:7px; border:none; background:var(--accent); color:#fff; cursor:pointer; font-weight:600; }
+
+  /* Gist設定 */
+  .setting-row { display:flex; flex-direction:column; gap:4px; }
+  .setting-row label { text-transform:none; letter-spacing:0; font-size:12px; }
+  .setting-row input { font-family:monospace; }
+  .setting-note { font-size:11px; color:var(--text-muted); line-height:1.5; }
+  .setting-status { padding:8px 12px; border-radius:6px; font-size:13px; display:none; }
+  .setting-status.ok  { background:#e8f5e9; color:#2e7d32; display:block; }
+  .setting-status.err { background:var(--danger-light); color:var(--danger); display:block; }
+
+  /* PWAインストール */
+  #install-banner { position:fixed; bottom:0; left:0; right:0; background:var(--surface); border-top:1px solid var(--border); padding:12px 16px; display:none; align-items:center; justify-content:space-between; z-index:200; box-shadow:0 -2px 8px rgba(0,0,0,.1); }
+  #install-banner.show { display:flex; }
+  #install-banner .banner-text { font-size:13px; color:var(--text); }
+  #install-banner .banner-text strong { display:block; font-size:14px; }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-title">授業<span>ログ</span></div>
+  <nav class="tabs">
+    <button class="tab-btn active" onclick="showTab('input')" id="tab-input">記録する</button>
+    <button class="tab-btn" onclick="showTab('list')" id="tab-list">
+      一覧 <span class="tab-count" id="total-count">0</span>
+    </button>
+    <button class="tab-btn" onclick="showTab('settings')" id="tab-settings">⚙ 設定</button>
+  </nav>
+  <span id="sync-indicator">📱ローカル</span>
+</header>
+
+<!-- 記録ページ -->
+<div class="page active" id="page-input">
+  <div class="form-card">
+    <div>
+      <label>日付</label>
+      <input type="date" id="inp-date">
+    </div>
+    <div>
+      <label>科目</label>
+      <select id="inp-subject" onchange="onSubjectChange()">
+        <option value="">-- 選択してください --</option>
+      </select>
+    </div>
+    <div class="subject-info" id="subject-info">
+      <div class="subject-info-header">
+        <span class="nth-badge" id="nth-badge"></span>
+        <span class="sub-label" id="nth-label"></span>
+      </div>
+      <div class="prev-box" id="prev-box" style="display:none">
+        <div class="prev-box-title">前回の授業内容</div>
+        <div class="prev-content" id="prev-content"></div>
+        <div class="prev-todo" id="prev-todo" style="display:none"></div>
+      </div>
+    </div>
+    <div>
+      <label>授業内容</label>
+      <textarea id="inp-content" placeholder="今日教えた内容、気づき、生徒の様子など"></textarea>
+    </div>
+    <div>
+      <label>次回への引き継ぎ / TODO</label>
+      <textarea id="inp-todo" class="todo-area" placeholder="次の授業でやること、準備が必要なことなど"></textarea>
+    </div>
+    <button class="btn-save" id="btn-save" onclick="saveRecord()">記録する</button>
+    <div style="font-size:11px;color:var(--text-muted);text-align:right;margin-top:-8px;">Ctrl+Enter（Mac: ⌘+Enter）でも記録できます</div>
+    <div class="flash" id="flash"></div>
+  </div>
+</div>
+
+<!-- 一覧ページ -->
+<div class="page" id="page-list">
+  <div class="list-page">
+    <div class="filter-bar">
+      <div class="filter-row1">
+        <input type="text" id="filter-text" placeholder="キーワード検索" oninput="renderList()">
+        <div class="view-toggle">
+          <button class="vt-btn active" id="vt-flat" onclick="setView('flat')">日付順</button>
+          <button class="vt-btn" id="vt-grouped" onclick="setView('grouped')">科目別</button>
+        </div>
+      </div>
+      <div class="filter-row2">
+        <select id="filter-subject" onchange="renderList()">
+          <option value="">全科目</option>
+        </select>
+        <input type="month" id="filter-month" onchange="renderList()">
+        <button class="btn-export" onclick="exportCSV()">CSV</button>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+      <span class="result-count" id="count-badge"></span>
+    </div>
+    <div id="record-list"></div>
+  </div>
+</div>
+
+<!-- 設定ページ -->
+<div class="page" id="page-settings">
+  <div class="settings-card">
+    <h2>科目の管理</h2>
+    <p style="font-size:13px;color:var(--text-muted);line-height:1.7;">科目を追加・削除・並び替えできます。</p>
+    <div class="subject-list-edit" id="subject-list-edit"></div>
+    <div class="add-subject-row">
+      <input type="text" id="new-subject-name" placeholder="新しい科目名を入力" onkeydown="if(event.key==='Enter')addSubjectItem()">
+      <button onclick="addSubjectItem()">＋ 追加</button>
+    </div>
+    <button class="btn-save" id="btn-save-subjects" onclick="saveSubjects()">保存する</button>
+    <div class="flash" id="flash-settings"></div>
+  </div>
+
+  <!-- CSVインポート -->
+  <div class="settings-card" style="margin-top:1px;">
+    <h2>データのインポート</h2>
+    <p style="font-size:13px;color:var(--text-muted);line-height:1.7;">
+      CSVファイルを取り込みます。すでに同じIDがある行はスキップされます。
+    </p>
+    <input type="file" id="import-file" accept=".csv" style="font-size:13px;">
+    <button class="btn-save" id="btn-import" onclick="importFromCSV()">インポート実行</button>
+    <div class="flash" id="flash-import"></div>
+  </div>
+
+  <!-- Gist同期設定 -->
+  <div class="settings-card" style="margin-top:1px;">
+    <h2>☁ GitHub Gist 同期設定</h2>
+    <div class="setting-row">
+      <label>GitHub トークン（gistスコープ必須）</label>
+      <input type="password" id="gist-token-input" placeholder="ghp_xxxx または github_pat_xxxx">
+      <div class="setting-note">ターミナルで <code>gh auth token</code> を実行するとトークンが表示されます。</div>
+    </div>
+    <div class="setting-row">
+      <label>Gist ID（初回接続後に自動入力）</label>
+      <input type="text" id="gist-id-input" placeholder="自動生成されます">
+    </div>
+    <div id="setting-status" class="setting-status"></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-save" style="flex:1;font-size:13px;padding:10px;" onclick="testAndSaveGist()">接続テスト &amp; 保存</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);">※ トークンはこのデバイスのブラウザにのみ保存されます</div>
+  </div>
+</div>
+
+<!-- PWAインストールバナー -->
+<div id="install-banner">
+  <div class="banner-text">
+    <strong>📲 ホーム画面に追加</strong>アプリとして使えます
+  </div>
+  <div style="display:flex;gap:8px;">
+    <button class="btn-sm btn-primary" onclick="installApp()">追加</button>
+    <button class="btn-sm btn-cancel" onclick="dismissInstall()">後で</button>
+  </div>
+</div>
+
+<script>
+// =============================================
+//  定数・状態
+// =============================================
+const RECORDS_KEY  = "jugyolog_records_v1";
+const SUBJECTS_KEY = "jugyolog_subjects_v1";
+const GIST_TOKEN_KEY = "jugyolog_gist_token";
+const GIST_ID_KEY    = "jugyolog_gist_id";
+const GIST_FILE      = "jugyolog_data.json";
+
+let records  = [];
+let subjects = [];
+let editingSubjects = [];
+let editingId = null;
+let viewMode  = "flat";
+let syncTimer = null;
+let pendingSync = false;
+let gistToken = localStorage.getItem(GIST_TOKEN_KEY) || "";
+let gistId    = localStorage.getItem(GIST_ID_KEY)    || "";
+
+// =============================================
+//  Gist 同期
+// =============================================
+function setSync(state) {
+  const el = document.getElementById("sync-indicator");
+  if (!el) return;
+  if (!gistToken) { el.textContent = "📱ローカル"; return; }
+  if (state === "syncing") el.textContent = "⟳ 同期中…";
+  else if (state === "error") el.textContent = "⚠ 同期失敗";
+  else el.textContent = "☁ 同期済み";
+}
+
+async function loadFromGist() {
+  if (!gistToken || !gistId) return false;
+  try {
+    setSync("syncing");
+    const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+      headers: { Authorization: `token ${gistToken}`, Accept: "application/vnd.github.v3+json" }
+    });
+    if (!res.ok) { setSync("error"); return false; }
+    const gist = await res.json();
+    const raw = gist.files[GIST_FILE]?.content;
+    if (!raw) { setSync("idle"); return false; }
+    const data = JSON.parse(raw);
+    if (Array.isArray(data.records))  { records  = data.records;  localStorage.setItem(RECORDS_KEY,  JSON.stringify(records)); }
+    if (Array.isArray(data.subjects)) { subjects = data.subjects; localStorage.setItem(SUBJECTS_KEY, JSON.stringify(subjects)); }
+    setSync("idle");
+    return true;
+  } catch(e) { console.error(e); setSync("error"); return false; }
+}
+
+async function createGist() {
+  const res = await fetch("https://api.github.com/gists", {
+    method: "POST",
+    headers: { Authorization: `token ${gistToken}`, Accept: "application/vnd.github.v3+json", "Content-Type": "application/json" },
+    body: JSON.stringify({ description: "授業ログ Data", public: false, files: { [GIST_FILE]: { content: JSON.stringify({records, subjects}) } } })
+  });
+  if (!res.ok) throw new Error("Gist作成失敗");
+  const gist = await res.json();
+  gistId = gist.id;
+  localStorage.setItem(GIST_ID_KEY, gistId);
+}
+
+async function pushToGist() {
+  if (!gistToken) return;
+  try {
+    setSync("syncing");
+    if (!gistId) await createGist();
+    const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+      method: "PATCH",
+      headers: { Authorization: `token ${gistToken}`, Accept: "application/vnd.github.v3+json", "Content-Type": "application/json" },
+      body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify({records, subjects}) } } })
+    });
+    if (!res.ok) throw new Error("同期失敗");
+    pendingSync = false; setSync("idle");
+  } catch(e) { console.error(e); setSync("error"); }
+}
+
+function schedulePush() {
+  localStorage.setItem(RECORDS_KEY,  JSON.stringify(records));
+  localStorage.setItem(SUBJECTS_KEY, JSON.stringify(subjects));
+  if (gistToken) { pendingSync = true; clearTimeout(syncTimer); syncTimer = setTimeout(pushToGist, 800); }
+}
+
+window.addEventListener("beforeunload", () => { if (pendingSync) pushToGist(); });
+
+// =============================================
+//  Gist設定UI
+// =============================================
+async function testAndSaveGist() {
+  const token = document.getElementById("gist-token-input").value.trim();
+  const id    = document.getElementById("gist-id-input").value.trim();
+  const el    = document.getElementById("setting-status");
+  el.className = "setting-status"; el.textContent = "接続確認中…";
+  try {
+    const res = await fetch("https://api.github.com/user", {
+      headers: { Authorization: `token ${token}`, Accept: "application/vnd.github.v3+json" }
+    });
+    if (!res.ok) throw new Error("トークンが無効です");
+    const user = await res.json();
+    gistToken = token; gistId = id;
+    localStorage.setItem(GIST_TOKEN_KEY, gistToken);
+    localStorage.setItem(GIST_ID_KEY, gistId);
+    el.className = "setting-status ok";
+    el.textContent = `✓ 接続成功 (${user.login})。データを同期します…`;
+    if (gistId) { await loadFromGist(); refreshAll(); }
+    else { await pushToGist(); }
+    setSync("idle");
+  } catch(e) { el.className = "setting-status err"; el.textContent = "✗ " + e.message; }
+}
+
+// =============================================
+//  PWAインストール
+// =============================================
+let deferredInstall = null;
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault(); deferredInstall = e;
+  if (!localStorage.getItem("pwa_dismissed")) document.getElementById("install-banner").classList.add("show");
+});
+window.addEventListener("appinstalled", () => {
+  document.getElementById("install-banner").classList.remove("show"); deferredInstall = null;
+});
+function installApp() {
+  if (!deferredInstall) return;
+  deferredInstall.prompt();
+  deferredInstall.userChoice.then(() => { deferredInstall = null; document.getElementById("install-banner").classList.remove("show"); });
+}
+function dismissInstall() {
+  document.getElementById("install-banner").classList.remove("show");
+  localStorage.setItem("pwa_dismissed", "1");
+}
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(console.error);
+
+// =============================================
+//  初期化
+// =============================================
+async function init() {
+  try { records  = JSON.parse(localStorage.getItem(RECORDS_KEY)  || "[]"); } catch { records  = []; }
+  try { subjects = JSON.parse(localStorage.getItem(SUBJECTS_KEY) || "null") || ["情報Ⅰ","簿記","マーケティング","情報処理","ソフトウェア活用","ビジネス基礎"]; } catch { subjects = []; }
+
+  document.getElementById("inp-date").value = today();
+  populateSubjectSelects();
+  updateTotalCount();
+  setSync("idle");
+
+  if (gistToken && gistId) {
+    await loadFromGist();
+    refreshAll();
+  } else if (!gistToken) {
+    setTimeout(() => {
+      if (!localStorage.getItem("gist_setup_dismissed")) showTab("settings");
+    }, 1000);
+  }
+
+  document.getElementById("gist-token-input").value = gistToken;
+  document.getElementById("gist-id-input").value    = gistId;
+}
+
+function refreshAll() {
+  populateSubjectSelects();
+  updateTotalCount();
+  onSubjectChange();
+  if (document.getElementById("page-list").classList.contains("active")) renderList();
+}
+
+// =============================================
+//  UI helpers
+// =============================================
+function showTab(name) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById("page-" + name).classList.add("active");
+  document.getElementById("tab-" + name).classList.add("active");
+  if (name === "list") renderList();
+  if (name === "settings") { editingSubjects = [...subjects]; renderSubjectListEdit(); document.getElementById("gist-token-input").value = gistToken; document.getElementById("gist-id-input").value = gistId; }
+}
+
+function today() { return new Date().toISOString().split("T")[0]; }
+
+function esc(s) {
+  return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function formatDate(d) {
+  if (!d) return "";
+  const [y,m,day] = d.split("-");
+  const weekday = ["日","月","火","水","木","金","土"][new Date(d).getDay()];
+  return `${y}/${m}/${day}（${weekday}）`;
+}
+
+function updateTotalCount() {
+  document.getElementById("total-count").textContent = records.length;
+}
+
+function flash(id, msg, type = "ok") {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.className = `flash show ${type}`;
+  setTimeout(() => { el.className = "flash"; }, 2200);
+}
+
+// =============================================
+//  科目セレクト
+// =============================================
+function populateSubjectSelects() {
+  document.getElementById("inp-subject").innerHTML =
+    `<option value="">-- 選択してください --</option>` +
+    subjects.map(s => `<option>${esc(s)}</option>`).join("");
+  document.getElementById("filter-subject").innerHTML =
+    `<option value="">全科目</option>` +
+    subjects.map(s => `<option>${esc(s)}</option>`).join("");
+}
+
+// =============================================
+//  科目情報ボックス
+// =============================================
+function getSubjectRecords(subject) {
+  return records.filter(r => r.subject === subject)
+    .sort((a,b) => a.date < b.date ? -1 : a.date > b.date ? 1 : Number(a.id) - Number(b.id));
+}
+
+function buildNthMap() {
+  const map = {};
+  [...new Set(records.map(r => r.subject))].forEach(sub => {
+    getSubjectRecords(sub).forEach((r,i) => { map[r.id] = i + 1; });
+  });
+  return map;
+}
+
+function onSubjectChange() {
+  const subject = document.getElementById("inp-subject").value;
+  const infoBox = document.getElementById("subject-info");
+  if (!subject) { infoBox.classList.remove("visible"); return; }
+  const subRecs = getSubjectRecords(subject);
+  document.getElementById("nth-badge").textContent = `第 ${subRecs.length + 1} 回`;
+  document.getElementById("nth-label").textContent = subRecs.length === 0
+    ? "初めての記録です"
+    : `前回: ${formatDate(subRecs[subRecs.length-1].date)}`;
+  const prevBox = document.getElementById("prev-box");
+  if (subRecs.length > 0) {
+    const prev = subRecs[subRecs.length-1];
+    document.getElementById("prev-content").textContent = prev.content || "（内容なし）";
+    const todoEl = document.getElementById("prev-todo");
+    if (prev.todo) { todoEl.textContent = prev.todo; todoEl.style.display = "block"; }
+    else todoEl.style.display = "none";
+    prevBox.style.display = "block";
+  } else {
+    prevBox.style.display = "none";
+  }
+  infoBox.classList.add("visible");
+}
+
+// =============================================
+//  記録の保存
+// =============================================
+function saveRecord() {
+  const date    = document.getElementById("inp-date").value || today();
+  const subject = document.getElementById("inp-subject").value;
+  const content = document.getElementById("inp-content").value.trim();
+  const todo    = document.getElementById("inp-todo").value.trim();
+  if (!subject) { alert("科目を選択してください"); return; }
+  if (!content && !todo) { alert("授業内容または次回TODOを入力してください"); return; }
+  const r = { id: String(Date.now()), date, subject, content, todo, created: new Date().toISOString() };
+  const btn = document.getElementById("btn-save");
+  btn.disabled = true; btn.textContent = "保存中…";
+  records.unshift(r);
+  schedulePush();
+  document.getElementById("inp-content").value = "";
+  document.getElementById("inp-todo").value = "";
+  document.getElementById("inp-date").value = today();
+  onSubjectChange();
+  updateTotalCount();
+  btn.disabled = false; btn.textContent = "記録する";
+  flash("flash", "保存しました ✓");
+}
+
+// =============================================
+//  削除・編集
+// =============================================
+function deleteRecord(id) {
+  if (!confirm("この記録を削除しますか？")) return;
+  records = records.filter(r => r.id !== id);
+  schedulePush();
+  onSubjectChange();
+  updateTotalCount();
+  renderList();
+}
+
+function startEdit(id) { editingId = id; renderList(); }
+function cancelEdit()  { editingId = null; renderList(); }
+
+function saveEdit(id) {
+  const r = records.find(r => r.id === id); if (!r) return;
+  r.date    = document.getElementById(`e-date-${id}`).value;
+  r.subject = document.getElementById(`e-subject-${id}`).value;
+  r.content = document.getElementById(`e-content-${id}`).value.trim();
+  r.todo    = document.getElementById(`e-todo-${id}`).value.trim();
+  editingId = null;
+  schedulePush();
+  onSubjectChange();
+  renderList();
+}
+
+// =============================================
+//  一覧表示
+// =============================================
+function setView(mode) {
+  viewMode = mode;
+  document.getElementById("vt-flat").classList.toggle("active", mode === "flat");
+  document.getElementById("vt-grouped").classList.toggle("active", mode === "grouped");
+  renderList();
+}
+
+function filtered() {
+  const text    = document.getElementById("filter-text").value.toLowerCase();
+  const subject = document.getElementById("filter-subject").value;
+  const month   = document.getElementById("filter-month").value;
+  return records.filter(r => {
+    if (subject && r.subject !== subject) return false;
+    if (month && !r.date.startsWith(month)) return false;
+    if (text && ![r.date,r.subject,r.content,r.todo].join(" ").toLowerCase().includes(text)) return false;
+    return true;
+  });
+}
+
+function cardHTML(r, nth) {
+  if (editingId === r.id) return editCardHTML(r);
+  return `
+  <div class="record-card" id="card-${r.id}">
+    <div class="card-actions">
+      <button class="btn-icon" onclick="startEdit('${r.id}')" title="編集">✏️</button>
+      <button class="btn-icon" onclick="deleteRecord('${r.id}')" title="削除">🗑</button>
+    </div>
+    <div class="card-top">
+      <span class="card-date">${esc(formatDate(r.date))}</span>
+      ${viewMode==="flat"&&r.subject?`<span class="card-subject">${esc(r.subject)}</span>`:""}
+      ${nth?`<span class="card-nth">第 ${nth} 回</span>`:""}
+    </div>
+    ${r.content?`<div class="card-content">${esc(r.content)}</div>`:""}
+    ${r.todo?`<div class="card-todo">${esc(r.todo)}</div>`:""}
+  </div>`;
+}
+
+function editCardHTML(r) {
+  const opts = subjects.map(s => `<option${r.subject===s?" selected":""}>${esc(s)}</option>`).join("");
+  return `
+  <div class="record-card editing" id="card-${r.id}">
+    <div class="edit-form">
+      <div><label>日付</label><input id="e-date-${r.id}" type="date" value="${esc(r.date)}"></div>
+      <div><label>科目</label><select id="e-subject-${r.id}"><option value="">-- 選択 --</option>${opts}</select></div>
+      <div><label>授業内容</label><textarea id="e-content-${r.id}">${esc(r.content)}</textarea></div>
+      <div><label>次回 TODO</label><textarea id="e-todo-${r.id}" class="todo-area">${esc(r.todo)}</textarea></div>
+      <div class="edit-actions">
+        <button class="btn-sm btn-primary" onclick="saveEdit('${r.id}')">保存</button>
+        <button class="btn-sm btn-cancel" onclick="cancelEdit()">キャンセル</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderList() {
+  const list = filtered();
+  const nthMap = buildNthMap();
+  const container = document.getElementById("record-list");
+  document.getElementById("count-badge").textContent = `${list.length} 件`;
+  if (!list.length) { container.innerHTML = "<div class=\"empty\">記録がありません</div>"; return; }
+  if (viewMode === "flat") {
+    const sorted = [...list].sort((a,b) => b.date.localeCompare(a.date) || Number(b.id)-Number(a.id));
+    container.innerHTML = `<div class="record-list">${sorted.map(r=>cardHTML(r,nthMap[r.id])).join("")}</div>`;
+  } else {
+    const allSubs = [...subjects];
+    list.forEach(r => { if (!allSubs.includes(r.subject)) allSubs.push(r.subject); });
+    let html = "";
+    allSubs.forEach(sub => {
+      const subList = list.filter(r=>r.subject===sub).sort((a,b)=>b.date.localeCompare(a.date)||Number(b.id)-Number(a.id));
+      if (!subList.length) return;
+      html += `<div class="subject-section">
+        <div class="section-header"><span class="section-title">${esc(sub)}</span><span class="section-total">${subList.length} 回分</span></div>
+        <div class="record-list">${subList.map(r=>cardHTML(r,nthMap[r.id])).join("")}</div>
+      </div>`;
+    });
+    container.innerHTML = html;
+  }
+}
+
+// =============================================
+//  CSV書き出し
+// =============================================
+function exportCSV() {
+  const list = filtered();
+  const nthMap = buildNthMap();
+  if (!list.length) { alert("書き出すデータがありません"); return; }
+  const sorted = [...list].sort((a,b) => b.date.localeCompare(a.date));
+  const header = ["日付","科目","回数","授業内容","次回TODO","作成日時"];
+  const rows = sorted.map(r =>
+    [r.date, r.subject, nthMap[r.id]?`第${nthMap[r.id]}回`:"", r.content, r.todo, r.created]
+    .map(v => `"${(v||"").replace(/"/g,'""')}"`).join(",")
+  );
+  const csv = "﻿" + [header.join(","), ...rows].join("\r\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = `授業ログ_${today()}.csv`; a.click();
+}
+
+// =============================================
+//  設定：科目管理
+// =============================================
+function renderSubjectListEdit() {
+  const c = document.getElementById("subject-list-edit");
+  if (!editingSubjects.length) { c.innerHTML = "<div style=\"font-size:13px;color:var(--text-muted);padding:8px 0;\">科目がありません</div>"; return; }
+  c.innerHTML = editingSubjects.map((s,i) => `
+    <div class="subject-item">
+      <span class="subject-item-name">${esc(s)}</span>
+      <div class="subject-order-btns">
+        <button class="btn-order" onclick="moveSubject(${i},-1)" ${i===0?"disabled":""}>▲</button>
+        <button class="btn-order" onclick="moveSubject(${i},1)"  ${i===editingSubjects.length-1?"disabled":""}>▼</button>
+      </div>
+      <button class="btn-del" onclick="removeSubject(${i})">×</button>
+    </div>`).join("");
+}
+
+function addSubjectItem() {
+  const inp = document.getElementById("new-subject-name");
+  const name = inp.value.trim();
+  if (!name) return;
+  if (editingSubjects.includes(name)) { alert("同じ科目名がすでにあります"); return; }
+  editingSubjects.push(name); inp.value = ""; renderSubjectListEdit();
+}
+
+function removeSubject(i) {
+  if (!confirm(`「${editingSubjects[i]}」を削除しますか？`)) return;
+  editingSubjects.splice(i,1); renderSubjectListEdit();
+}
+
+function moveSubject(i, dir) {
+  const j = i+dir;
+  if (j<0||j>=editingSubjects.length) return;
+  [editingSubjects[i],editingSubjects[j]] = [editingSubjects[j],editingSubjects[i]];
+  renderSubjectListEdit();
+}
+
+function saveSubjects() {
+  if (!editingSubjects.length) { alert("科目が空です"); return; }
+  subjects = [...editingSubjects];
+  schedulePush();
+  populateSubjectSelects();
+  flash("flash-settings", "科目を保存しました ✓");
+}
+
+// =============================================
+//  CSVインポート
+// =============================================
+function parseCSV(text) {
+  text = text.replace(/^﻿/, "");
+  const rows = []; let cur="", inQ=false, row=[];
+  for (let i=0; i<text.length; i++) {
+    const c = text[i];
+    if (c==='"') { if (inQ&&text[i+1]==='"') { cur+='"'; i++; } else inQ=!inQ; }
+    else if (c===","&&!inQ) { row.push(cur); cur=""; }
+    else if ((c==="\r"||c==="\n")&&!inQ) { if(c==="\r"&&text[i+1]==="\n") i++; row.push(cur); cur=""; rows.push(row); row=[]; }
+    else cur+=c;
+  }
+  row.push(cur); if (row.some(v=>v!=="")) rows.push(row);
+  if (rows.length<2) return [];
+  const headers=rows[0];
+  return rows.slice(1).filter(cols=>cols.some(v=>v.trim())).map((cols,i) => {
+    const obj={}; headers.forEach((h,j)=>{obj[h]=cols[j]||"";});
+    return { id: String(Date.now()+i), date: obj["日付"]||"", subject: obj["科目"]||"", content: obj["授業内容"]||"", todo: obj["次回TODO"]||"", created: obj["作成日時"]||new Date().toISOString() };
+  });
+}
+
+function importFromCSV() {
+  const file = document.getElementById("import-file").files[0];
+  if (!file) { alert("CSVファイルを選択してください"); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = parseCSV(e.target.result);
+      if (!parsed.length) { flash("flash-import","データが見つかりませんでした","err"); return; }
+      const existIds = new Set(records.map(r=>r.id));
+      const toAdd = parsed.filter(r=>!existIds.has(r.id));
+      records = [...toAdd, ...records];
+      schedulePush();
+      updateTotalCount();
+      flash("flash-import", `完了：${toAdd.length}件追加、${parsed.length-toAdd.length}件スキップ`);
+    } catch(err) { flash("flash-import","CSV読み込みエラー: "+err,"err"); }
+  };
+  reader.readAsText(file,"UTF-8");
+}
+
+// =============================================
+//  キーボードショートカット
+// =============================================
+["inp-content","inp-todo"].forEach(id => {
+  document.getElementById(id).addEventListener("keydown", e => {
+    if (e.key==="Enter"&&(e.ctrlKey||e.metaKey)) { e.preventDefault(); saveRecord(); }
+  });
+});
+document.addEventListener("keydown", e => {
+  if (e.key==="Enter"&&(e.ctrlKey||e.metaKey)) {
+    const m = e.target.id?.match(/^e-(?:content|todo)-(.+)$/);
+    if (m) { e.preventDefault(); saveEdit(m[1]); }
+  }
+});
+
+// =============================================
+//  起動
+// =============================================
+init();
+</script>
+</body>
+</html>
