@@ -489,9 +489,17 @@ function showTab(name) {
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
   document.getElementById("page-" + name).classList.add("active");
   document.getElementById("tab-" + name).classList.add("active");
+  if (name === "input") document.getElementById("inp-date").value = today();
   if (name === "list") renderList();
   if (name === "settings") { editingSubjects = [...subjects]; renderSubjectListEdit(); document.getElementById("gist-token-input").value = gistToken; document.getElementById("gist-id-input").value = gistId; }
 }
+
+// アプリが前面に戻ったとき日付を更新
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    document.getElementById("inp-date").value = today();
+  }
+});
 
 function today() { return new Date().toISOString().split("T")[0]; }
 
